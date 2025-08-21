@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import {vertexAI} from '@genkit-ai/googleai';
 
 const GetArticleContentInputSchema = z.object({
   url: z.string().url().describe('The URL of the article to fetch.'),
@@ -31,31 +32,22 @@ export async function getArticleContent(
   return getArticleContentFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'getArticleContentPrompt',
-  input: {schema: z.object({articleHtml: z.string()})},
-  output: {schema: GetArticleContentOutputSchema},
-  prompt: `You are an expert at extracting the main article content from a web page's HTML.
-  Extract the main text content from the following HTML, removing all boilerplate like headers, footers, ads, and navigation.
-
-  HTML:
-  {{{articleHtml}}}`,
-});
-
 const getArticleContentFlow = ai.defineFlow(
   {
     name: 'getArticleContentFlow',
     inputSchema: GetArticleContentInputSchema,
     outputSchema: GetArticleContentOutputSchema,
+    model: vertexAI('gemini-1.5-pro'),
+    tools: [ai.tool.googleSearch()],
   },
   async input => {
-    const response = await fetch(input.url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch article from ${input.url}`);
-    }
-    const articleHtml = await response.text();
+    const {output} = await ai.generate({
+      prompt: `Extract the main text content from the following URL, removing all boilerplate like headers, footers, ads, and navigation.
 
-    const {output} = await prompt({articleHtml});
-    return output!;
+  URL:
+  ${input.url}`,
+    });
+    const articleContent = output as string;
+    return {articleContent};
   }
 );
