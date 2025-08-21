@@ -30,6 +30,7 @@ import {
   summarizeArticle,
   type SummarizeArticleOutput,
 } from "@/ai/flows/summarize-article";
+import { getArticleContent } from "@/ai/flows/get-article-content";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "./ui/skeleton";
 
@@ -47,6 +48,7 @@ const formSchema = z.object({
 export function ArticleSummarizer() {
   const [summary, setSummary] = useState<SummarizeArticleOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -56,6 +58,37 @@ export function ArticleSummarizer() {
       articleContent: "",
     },
   });
+
+  const handleFetchArticle = async () => {
+    const url = form.getValues("articleUrl");
+    if (!url) {
+      form.setError("articleUrl", {
+        type: "manual",
+        message: "Please enter a URL to fetch.",
+      });
+      return;
+    }
+    // Clear previous error
+    form.clearErrors("articleUrl");
+
+    setIsFetching(true);
+    try {
+      const result = await getArticleContent({ url });
+      form.setValue("articleContent", result.articleContent, {
+        shouldValidate: true,
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch the article content. Please try again or paste the content manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
@@ -84,12 +117,18 @@ export function ArticleSummarizer() {
             name="articleUrl"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-lg">Article URL (Optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="https://example.com/article" {...field} />
-                </FormControl>
+                <FormLabel className="text-lg">Article URL</FormLabel>
+                <div className="flex items-center gap-2">
+                  <FormControl>
+                    <Input placeholder="https://example.com/article" {...field} />
+                  </FormControl>
+                  <Button type="button" onClick={handleFetchArticle} disabled={isFetching || !field.value} className="w-40">
+                    {isFetching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Fetch Article
+                  </Button>
+                </div>
                 <FormDescription>
-                  Provide a link to the original article for easy access.
+                  Enter a URL and click "Fetch Article" to automatically load the content.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -103,19 +142,19 @@ export function ArticleSummarizer() {
                 <FormLabel className="text-lg">Article Content</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="Paste the full content of the news article here..."
+                    placeholder="Paste the full content of the news article here, or fetch it from a URL above."
                     className="min-h-[200px] resize-y"
                     {...field}
                   />
                 </FormControl>
                 <FormDescription>
-                  Paste the content you want to summarize.
+                  The content to be summarized will appear here.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
+          <Button type="submit" disabled={isLoading || isFetching} className="w-full sm:w-auto">
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Summarize Article
           </Button>
