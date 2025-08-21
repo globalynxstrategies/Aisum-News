@@ -10,7 +10,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {vertexAI} from '@genkit-ai/googleai';
 
 const GetArticleContentInputSchema = z.object({
   url: z.string().url().describe('The URL of the article to fetch.'),
@@ -37,11 +36,11 @@ const getArticleContentFlow = ai.defineFlow(
     name: 'getArticleContentFlow',
     inputSchema: GetArticleContentInputSchema,
     outputSchema: GetArticleContentOutputSchema,
-    model: vertexAI('gemini-1.5-pro'),
-    tools: [ai.tool.googleSearch()],
   },
   async input => {
     const {output} = await ai.generate({
+      model: 'googleai/gemini-1.5-pro',
+      tools: [ai.tool.googleSearch()],
       prompt: `Extract the main text content from the following URL, removing all boilerplate like headers, footers, ads, and navigation.
 
   URL:
